@@ -6,7 +6,7 @@ module Types.Pasta (Pasta(..)) where
 import Data.Aeson (FromJSON, ToJSON)
 import Database.MySQL.Simple.QueryResults
 import Database.MySQL.Simple.Result (convert)
-import GHC.Generics
+import GHC.Generics ( Generic )
 
 data Pasta = Pasta {
     _id :: Maybe Int,

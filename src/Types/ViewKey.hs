@@ -3,7 +3,7 @@
 module Types.ViewKey (ViewKey(..)) where
 
 import Data.Aeson (FromJSON)
-import GHC.Generics
+import GHC.Generics ( Generic )
 
 newtype ViewKey = ViewKey {
     view_key :: Maybe String

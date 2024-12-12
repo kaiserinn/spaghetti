@@ -8,7 +8,7 @@ import Control.Exception (SomeException, try)
 import Control.Monad.IO.Class (liftIO)
 import Data.Aeson (Value, object, (.=))
 import Data.Maybe (fromMaybe)
-import Data.NanoID
+import Data.NanoID ( nanoID )
 import Database.MySQL.Simple
 import Network.HTTP.Types.Status
 import Services.Connect (connection)

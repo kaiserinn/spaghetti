@@ -1,11 +1,9 @@
-{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE TypeApplications #-}
 
 module Main (main) where
 
 import Configuration.Dotenv (defaultConfig, loadFile)
-import Web.Scotty
+import Web.Scotty ( scotty )
 import Routes.Pasta (getPastaById, addPasta, deletePasta)
 
 main :: IO ()
