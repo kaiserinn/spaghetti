@@ -4,7 +4,7 @@ module Main (main) where
 
 import Configuration.Dotenv (defaultConfig, loadFile)
 import Web.Scotty ( scotty )
-import Routes.Pasta (getPastaById, addPasta, deletePasta)
+import Routes.Pasta (getPastaById, addPasta, deletePasta, editPasta)
 
 main :: IO ()
 main = do
