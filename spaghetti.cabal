@@ -50,6 +50,9 @@ library
 executable spaghetti-exe
   main-is: Main.hs
   other-modules:
+      Types.Pasta
+      Types.PastaWithoutEditKey
+      Types.ViewKey
       Paths_spaghetti
   autogen-modules:
       Paths_spaghetti

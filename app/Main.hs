@@ -1,6 +1,4 @@
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE DeriveGeneric #-}
-{-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE TypeApplications #-}
 
 module Main (main) where
@@ -9,45 +7,16 @@ import Services.Connect (connection)
 import Configuration.Dotenv (loadFile, defaultConfig)
 import Web.Scotty
 import Database.MySQL.Simple
-import Database.MySQL.Simple.QueryResults
-import Data.Aeson (ToJSON, FromJSON, object, (.=))
-import GHC.Generics
+import Data.Aeson (object, (.=))
 import Control.Monad.IO.Class (liftIO)
 import Control.Exception (try, SomeException)
-import Database.MySQL.Simple.Result (convert)
 import Network.HTTP.Types.Status
 import System.Random.MWC (createSystemRandom)
 import Data.Maybe (fromMaybe)
 import Data.NanoID
 
-data Pasta = Pasta {
-    _id :: Maybe Int,
-    title :: String,
-    content :: String,
-    slug :: Maybe String,
-    view_key :: Maybe String,
-    edit_key :: Maybe String
-} deriving (Show, Generic)
-
-instance ToJSON Pasta where
-instance FromJSON Pasta where
-
-instance QueryResults Pasta where
-    convertResults [fa,fb,fc,fd,fe,fg] [va,vb,vc,vd,ve,vg] =
-        Pasta { _id = a, title = b, content = c, slug = d, view_key = e, edit_key = g }
-            where !a = convert fa va
-                  !b = convert fb vb
-                  !c = convert fc vc
-                  !d = convert fd vd
-                  !e = convert fe ve
-                  !g = convert fg vg
-    convertResults fs vs  = convertError fs vs 2
-
-newtype ObjectWithViewCode = ObjectWithViewCode {
-    _view_key :: Maybe String
-} deriving (Generic, Show)
-
-instance FromJSON ObjectWithViewCode where
+import qualified Types.Pasta as Pasta
+import qualified Types.ViewKey as VK
 
 main :: IO ()
 main = do
@@ -57,13 +26,13 @@ main = do
     scotty 3000 $ do
         get "/api/pasta/:slug" $ do
             slugParam <- captureParam "slug" :: ActionM String
-            bodyViewKey <- jsonData :: ActionM ObjectWithViewCode
+            bodyViewKey <- jsonData :: ActionM VK.ViewKey
 
-            let viewKey = fromMaybe "" (_view_key bodyViewKey)
+            let viewKey = fromMaybe "" (VK.view_key bodyViewKey)
 
             result <- liftIO $ try $ do
-                query conn "SELECT id, title, content, slug, view_key, edit_key FROM pasta WHERE slug = ?"
-                    (Only slugParam) :: IO [Pasta]
+                query conn "SELECT id, title, content, slug, view_key, NULL AS edit_key FROM pasta WHERE slug = ?"
+                    (Only slugParam) :: IO [Pasta.Pasta]
 
             case result of
                 Left ex -> do
@@ -75,7 +44,7 @@ main = do
                     json $ object ["error" .= ("No pasta entry found for slug: " ++ slugParam)]
 
                 Right (pasta:_) -> do
-                    let requiredViewCode = view_key pasta
+                    let requiredViewCode = Pasta.view_key pasta
                     case requiredViewCode of
                         Nothing -> json pasta
 
@@ -89,12 +58,12 @@ main = do
                                     json $ object ["error" .= ("Invalid or missing view code" :: String)]
 
         post "/api/pasta" $ do
-            newPasta <- jsonData :: ActionM Pasta
+            newPasta <- jsonData :: ActionM Pasta.Pasta
 
             randomId <- liftIO $ createSystemRandom >>= nanoID
-            let newSlug = fromMaybe (show randomId) (slug newPasta)
-                viewKey = fromMaybe "" (view_key newPasta)
-                editKey = fromMaybe "" (edit_key newPasta)
+            let newSlug = fromMaybe (show randomId) (Pasta.slug newPasta)
+                viewKey = fromMaybe "" (Pasta.view_key newPasta)
+                editKey = fromMaybe "" (Pasta.edit_key newPasta)
 
             isExists <- liftIO $ try @SomeException $ do
                 query conn "SELECT 1 FROM pasta WHERE slug = ?" (Only newSlug) :: IO [Only Int]
@@ -106,7 +75,7 @@ main = do
                 Right [] -> do
                     result <- liftIO $ try @SomeException $ execute conn
                         "INSERT INTO pasta (title, content, slug, view_key, edit_key) VALUES (?, ?, ?, ?, ?)"
-                        (title newPasta, content newPasta, newSlug, viewKey, editKey)
+                        (Pasta.title newPasta, Pasta.content newPasta, newSlug, viewKey, editKey)
 
                     case result of
                         Left err -> do
