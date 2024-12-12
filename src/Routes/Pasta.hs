@@ -134,44 +134,49 @@ updatePasta = put "/api/pasta/:id" $ do
     conn <- liftIO connection
 
     idParam <- captureParam "id" :: ActionM Int
-    updatedPasta <- jsonData :: ActionM UP.Pasta
+    maybePasta <- catch (jsonData :: ActionM (Maybe UP.Pasta)) (\(_ :: SomeException) -> return Nothing)
 
-    currEditKey <- liftIO $ try @SomeException $ do
-        query conn
-            "SELECT id, title, content, NULL AS slug, NULL AS view_key, edit_key FROM pasta WHERE id = ?"
-            (Only idParam) :: IO [Pasta.Pasta]
+    case maybePasta of
+        Nothing -> do
+            status status400
+            json (object ["error" .= ("Invalid request body" :: String)])
+        Just updatedPasta -> do
+            currEditKey <- liftIO $ try @SomeException $ do
+                query conn
+                    "SELECT id, title, content, NULL AS slug, NULL AS view_key, edit_key FROM pasta WHERE id = ?"
+                    (Only idParam) :: IO [Pasta.Pasta]
 
-    case currEditKey of
-        Left ex -> do
-            status status500
-            json $ object ["error" .= ("Database error: " ++ show (ex :: SomeException))]
-        Right [] -> do
-            status status404
-            json $ object ["error" .= ("No pasta entry found for id: " ++ show idParam)]
-        Right (pasta:_) -> do
-            let currentEditKey = fromMaybe "" (Pasta.edit_key pasta)
-                providedEditKey = fromMaybe "" (UP.edit_key updatedPasta)
+            case currEditKey of
+                Left ex -> do
+                    status status500
+                    json $ object ["error" .= ("Database error: " ++ show (ex :: SomeException))]
+                Right [] -> do
+                    status status404
+                    json $ object ["error" .= ("No pasta entry found for id: " ++ show idParam)]
+                Right (pasta:_) -> do
+                    let currentEditKey = fromMaybe "" (Pasta.edit_key pasta)
+                        providedEditKey = fromMaybe "" (UP.edit_key updatedPasta)
 
-            if currentEditKey == providedEditKey
-                then do
-                    let newSlug = UP.slug updatedPasta
-                        newTitle = UP.title updatedPasta
-                        newContent = UP.content updatedPasta
-                        newViewKey = UP.view_key updatedPasta
-                        newEditKey = UP.updated_edit_key updatedPasta
+                    if currentEditKey == providedEditKey
+                        then do
+                            let newSlug = UP.slug updatedPasta
+                                newTitle = UP.title updatedPasta
+                                newContent = UP.content updatedPasta
+                                newViewKey = UP.view_key updatedPasta
+                                newEditKey = UP.updated_edit_key updatedPasta
 
-                    updateResult <- liftIO $ try @SomeException $ do
-                        execute conn
-                            "UPDATE pasta SET title = ?, content = ?, slug = ?, view_key = ?, edit_key = ? WHERE id = ?"
-                            (newTitle, newContent, newSlug, newViewKey, newEditKey, idParam)
+                            updateResult <- liftIO $ try @SomeException $ do
+                                execute conn
+                                    "UPDATE pasta SET title = ?, content = ?, slug = ?, view_key = ?, edit_key = ? WHERE id = ?"
+                                    (newTitle, newContent, newSlug, newViewKey, newEditKey, idParam)
 
-                    case updateResult of
-                        Left err -> do
-                            status status500
-                            json $ object ["error" .= ("Failed to update pasta" :: String), "details" .= show err]
-                        Right _ -> do
-                            status status200
-                            json (object ["message" .= ("Pasta updated successfully" :: String)])
-                else do
-                    status status401
-                    json $ object ["error" .= ("Invalid edit key" :: String)]
+                            case updateResult of
+                                Left err -> do
+                                    status status500
+                                    json $ object ["error" .= ("Failed to update pasta" :: String), "details" .= show err]
+                                Right _ -> do
+                                    status status200
+                                    json (object ["message" .= ("Pasta updated successfully" :: String)])
+                        else do
+                            status status401
+                            json $ object ["error" .= ("Invalid edit key" :: String)]
