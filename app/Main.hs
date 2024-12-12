@@ -24,60 +24,100 @@ data Pasta = Pasta {
     _id :: Maybe Int,
     title :: String,
     content :: String,
-    slug :: Maybe String
+    slug :: Maybe String,
+    view_key :: Maybe String,
+    edit_key :: Maybe String
 } deriving (Show, Generic)
 
 instance ToJSON Pasta where
 instance FromJSON Pasta where
 
 instance QueryResults Pasta where
-    convertResults [fa,fb,fc,fd] [va,vb,vc,vd] = Pasta { _id = a, title = b, content = c, slug = d }
-        where !a = convert fa va
-              !b = convert fb vb
-              !c = convert fc vc
-              !d = convert fd vd
+    convertResults [fa,fb,fc,fd,fe,fg] [va,vb,vc,vd,ve,vg] =
+        Pasta { _id = a, title = b, content = c, slug = d, view_key = e, edit_key = g }
+            where !a = convert fa va
+                  !b = convert fb vb
+                  !c = convert fc vc
+                  !d = convert fd vd
+                  !e = convert fe ve
+                  !g = convert fg vg
     convertResults fs vs  = convertError fs vs 2
+
+newtype ObjectWithViewCode = ObjectWithViewCode {
+    _view_key :: Maybe String
+} deriving (Generic, Show)
+
+instance FromJSON ObjectWithViewCode where
 
 main :: IO ()
 main = do
     loadFile defaultConfig
-
     conn <- connection
 
     scotty 3000 $ do
         get "/api/pasta/:slug" $ do
             slugParam <- captureParam "slug" :: ActionM String
+            bodyViewKey <- jsonData :: ActionM ObjectWithViewCode
+
+            let viewKey = fromMaybe "" (_view_key bodyViewKey)
 
             result <- liftIO $ try $ do
-                query conn "SELECT id, title, content, slug FROM pasta WHERE slug = ?" (Only slugParam) :: IO [Pasta]
+                query conn "SELECT id, title, content, slug, view_key, edit_key FROM pasta WHERE slug = ?"
+                    (Only slugParam) :: IO [Pasta]
 
             case result of
                 Left ex -> do
                     status status500
                     json $ object ["error" .= ("Database error: " ++ show (ex :: SomeException))]
+
                 Right [] -> do
                     status status404
                     json $ object ["error" .= ("No pasta entry found for slug: " ++ slugParam)]
+
                 Right (pasta:_) -> do
-                    json pasta
+                    let requiredViewCode = view_key pasta
+                    case requiredViewCode of
+                        Nothing -> json pasta
+
+                        Just "" -> json pasta
+
+                        Just expectedViewCode ->
+                            if expectedViewCode == viewKey
+                                then json pasta
+                                else do
+                                    status status401
+                                    json $ object ["error" .= ("Invalid or missing view code" :: String)]
 
         post "/api/pasta" $ do
             newPasta <- jsonData :: ActionM Pasta
 
             randomId <- liftIO $ createSystemRandom >>= nanoID
-            let newUrl = fromMaybe (show randomId) (slug newPasta)
+            let newSlug = fromMaybe (show randomId) (slug newPasta)
+                viewKey = fromMaybe "" (view_key newPasta)
+                editKey = fromMaybe "" (edit_key newPasta)
 
-            result <- liftIO $ try @SomeException $ execute conn
-                "INSERT INTO pasta (title, content, slug) VALUES (?, ?, ?)"
-                (title newPasta, content newPasta, newUrl)
+            isExists <- liftIO $ try @SomeException $ do
+                query conn "SELECT 1 FROM pasta WHERE slug = ?" (Only newSlug) :: IO [Only Int]
 
-            case result of
+            case isExists of
                 Left err -> do
                     status status500
-                    json (object ["error" .= ("Failed to save pasta" :: String), "details" .= show (err :: SomeException)])
+                    json (object ["error" .= ("Failed to check if pasta exists" :: String), "details" .= show (err :: SomeException)])
+                Right [] -> do
+                    result <- liftIO $ try @SomeException $ execute conn
+                        "INSERT INTO pasta (title, content, slug, view_key, edit_key) VALUES (?, ?, ?, ?, ?)"
+                        (title newPasta, content newPasta, newSlug, viewKey, editKey)
+
+                    case result of
+                        Left err -> do
+                            status status500
+                            json (object ["error" .= ("Failed to save pasta" :: String), "details" .= show (err :: SomeException)])
+                        Right _ -> do
+                            status status201
+                            json (object ["slug" .= newSlug])
                 Right _ -> do
-                    status status201
-                    json (object ["slug" .= newUrl])
+                    status status409
+                    json (object ["error" .= ("Pasta with the same slug already exists" :: String)])
 
         delete "/api/pasta/:slug" $ do
             slugParam <- captureParam "slug" :: ActionM String
