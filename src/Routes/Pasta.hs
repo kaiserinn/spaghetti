@@ -17,10 +17,8 @@ import UnliftIO.Exception (catch)
 import Web.Scotty
 
 import qualified Types.Pasta as Pasta
+import qualified Types.UpdatedPasta as UP
 import qualified Types.ViewKey as VK
-
-
-
 
 returnPasta:: Pasta.Pasta -> Value
 returnPasta pasta = object [
@@ -133,12 +131,14 @@ deletePasta = delete "/api/pasta/:slug" $ do
 
 updatePasta :: ScottyM ()
 updatePasta = put "/api/pasta/:id" $ do
-    idParam <- captureParam "id" :: ActionM Int
-    updatedPasta <- jsonData :: ActionM Pasta.Pasta
+    conn <- liftIO connection
 
-    -- Retrieve the current pasta entry from the database by id
+    idParam <- captureParam "id" :: ActionM Int
+    updatedPasta <- jsonData :: ActionM UP.Pasta
+
     currEditKey <- liftIO $ try @SomeException $ do
-        query conn "SELECT edit_key FROM pasta WHERE id = ?"
+        query conn
+            "SELECT id, title, content, NULL AS slug, NULL AS view_key, edit_key FROM pasta WHERE id = ?"
             (Only idParam) :: IO [Pasta.Pasta]
 
     case currEditKey of
@@ -149,20 +149,17 @@ updatePasta = put "/api/pasta/:id" $ do
             status status404
             json $ object ["error" .= ("No pasta entry found for id: " ++ show idParam)]
         Right (pasta:_) -> do
-            -- Check if the edit_key matches the one in the database
             let currentEditKey = fromMaybe "" (Pasta.edit_key pasta)
-                providedEditKey = fromMaybe "" (Pasta.edit_key updatedPasta)
+                providedEditKey = fromMaybe "" (UP.edit_key updatedPasta)
 
             if currentEditKey == providedEditKey
                 then do
-                    -- Update the pasta entry with the new values
-                    let newSlug = Pasta.slug updatedPasta
-                        newTitle = Pasta.title updatedPasta
-                        newContent = Pasta.content updatedPasta
-                        newViewKey = Pasta.view_key updatedPasta
-                        newEditKey = Pasta.updated_edit_key updatedPasta
+                    let newSlug = UP.slug updatedPasta
+                        newTitle = UP.title updatedPasta
+                        newContent = UP.content updatedPasta
+                        newViewKey = UP.view_key updatedPasta
+                        newEditKey = UP.updated_edit_key updatedPasta
 
-                    -- Execute the update query
                     updateResult <- liftIO $ try @SomeException $ do
                         execute conn
                             "UPDATE pasta SET title = ?, content = ?, slug = ?, view_key = ?, edit_key = ? WHERE id = ?"
@@ -176,7 +173,5 @@ updatePasta = put "/api/pasta/:id" $ do
                             status status200
                             json (object ["message" .= ("Pasta updated successfully" :: String)])
                 else do
-                    -- Return an error if the edit_key doesn't match
                     status status401
                     json $ object ["error" .= ("Invalid edit key" :: String)]
-
