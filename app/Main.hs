@@ -1,19 +1,21 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications #-}
 
 module Main (main) where
 
-import Services.Connect (connection)
-import Configuration.Dotenv (loadFile, defaultConfig)
-import Web.Scotty
-import Database.MySQL.Simple
-import Data.Aeson (object, (.=), Value)
+import Configuration.Dotenv (defaultConfig, loadFile)
+import Control.Exception (SomeException, try)
 import Control.Monad.IO.Class (liftIO)
-import Control.Exception (try, SomeException)
-import Network.HTTP.Types.Status
-import System.Random.MWC (createSystemRandom)
+import Data.Aeson (Value, object, (.=))
 import Data.Maybe (fromMaybe)
 import Data.NanoID
+import Database.MySQL.Simple
+import Network.HTTP.Types.Status
+import Services.Connect (connection)
+import System.Random.MWC (createSystemRandom)
+import UnliftIO.Exception (catch)
+import Web.Scotty
 
 import qualified Types.Pasta as Pasta
 import qualified Types.ViewKey as VK
@@ -34,7 +36,7 @@ main = do
     scotty 3000 $ do
         get "/api/pasta/:slug" $ do
             slugParam <- captureParam "slug" :: ActionM String
-            bodyViewKey <- jsonData :: ActionM VK.ViewKey
+            bodyViewKey <- catch (jsonData :: ActionM VK.ViewKey) (\(_ :: SomeException) -> return VK.ViewKey { VK.view_key = Nothing })
 
             let viewKey = fromMaybe "" (VK.view_key bodyViewKey)
 

@@ -1,6 +1,6 @@
 {-# LANGUAGE DeriveGeneric #-}
 
-module Types.ViewKey where
+module Types.ViewKey (ViewKey(..)) where
 
 import Data.Aeson (FromJSON)
 import GHC.Generics

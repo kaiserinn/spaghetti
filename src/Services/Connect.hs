@@ -1,7 +1,7 @@
 module Services.Connect (connection) where
 
-import System.Environment (getEnv)
 import Database.MySQL.Simple
+import System.Environment (getEnv)
 
 connection :: IO Connection
 connection = do

@@ -1,12 +1,12 @@
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE DeriveGeneric #-}
 
-module Types.Pasta where
+module Types.Pasta (Pasta(..)) where
 
-import Data.Aeson (ToJSON, FromJSON)
-import GHC.Generics
+import Data.Aeson (FromJSON, ToJSON)
 import Database.MySQL.Simple.QueryResults
 import Database.MySQL.Simple.Result (convert)
+import GHC.Generics
 
 data Pasta = Pasta {
     _id :: Maybe Int,
