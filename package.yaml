@@ -30,6 +30,7 @@ dependencies:
 - mwc-random
 - unliftio
 - dotenv
+- NanoID
 
 ghc-options:
 - -Wall

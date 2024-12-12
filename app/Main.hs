@@ -1,6 +1,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE TypeApplications #-}
 
 module Main (main) where
 
@@ -15,6 +16,9 @@ import Control.Monad.IO.Class (liftIO)
 import Control.Exception (try, SomeException)
 import Database.MySQL.Simple.Result (convert)
 import Network.HTTP.Types.Status
+import System.Random.MWC (createSystemRandom)
+import Data.Maybe (fromMaybe)
+import Data.NanoID
 
 data Pasta = Pasta {
     _id :: Maybe Int,
@@ -42,6 +46,7 @@ main = do
 
     scotty 3000 $ do
         get "/pasta/:slug" $ do
+        get "/api/pasta/:slug" $ do
             slugParam <- captureParam "slug" :: ActionM String
 
             result <- liftIO $ try $ do
@@ -56,3 +61,21 @@ main = do
                     json $ object ["error" .= ("No pasta entry found for slug: " ++ slugParam)]
                 Right (pasta:_) -> do
                     json pasta
+
+        post "/api/pasta" $ do
+            newPasta <- jsonData :: ActionM Pasta
+
+            randomId <- liftIO $ createSystemRandom >>= nanoID
+            let newUrl = fromMaybe (show randomId) (slug newPasta)
+
+            result <- liftIO $ try @SomeException $ execute conn
+                "INSERT INTO pasta (title, content, slug) VALUES (?, ?, ?)"
+                (title newPasta, content newPasta, newUrl)
+
+            case result of
+                Left err -> do
+                    status status500
+                    json (object ["error" .= ("Failed to save pasta" :: String), "details" .= show (err :: SomeException)])
+                Right _ -> do
+                    status status201
+                    json (object ["slug" .= newUrl])
