@@ -45,7 +45,6 @@ main = do
     conn <- connection
 
     scotty 3000 $ do
-        get "/pasta/:slug" $ do
         get "/api/pasta/:slug" $ do
             slugParam <- captureParam "slug" :: ActionM String
 
@@ -79,3 +78,22 @@ main = do
                 Right _ -> do
                     status status201
                     json (object ["slug" .= newUrl])
+
+        delete "/api/pasta/:slug" $ do
+            slugParam <- captureParam "slug" :: ActionM String
+
+            result <- liftIO $ try @SomeException $ do
+                execute conn "DELETE FROM pasta WHERE slug = ?" (Only slugParam)
+
+            case result of
+                Left err -> do
+                    status status500
+                    json (object ["error" .= ("Failed to delete pasta" :: String), "details" .= show err])
+                Right rowsAffected -> do
+                    if rowsAffected == 0
+                        then do
+                            status status404
+                            json (object ["error" .= ("Pasta not found" :: String)])
+                        else do
+                            status status200
+                            json (object ["message" .= ("Pasta deleted successfully" :: String)])
