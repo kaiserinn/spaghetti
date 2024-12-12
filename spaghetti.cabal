@@ -28,6 +28,7 @@ library
       Routes.Pasta
       Services.Connect
       Types.Pasta
+      Types.UpdatedPasta
       Types.ViewKey
   other-modules:
       Paths_spaghetti

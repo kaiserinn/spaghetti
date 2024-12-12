@@ -2,11 +2,11 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications #-}
 
-module Routes.Pasta (getPastaById, addPasta, deletePasta) where
+module Routes.Pasta (getPastaById, addPasta, deletePasta, updatePasta) where
 
 import Control.Exception (SomeException, try)
 import Control.Monad.IO.Class (liftIO)
-import Data.Aeson (Value, object, (.=))
+import Data.Aeson (Value, object, (.=),)
 import Data.Maybe (fromMaybe)
 import Data.NanoID ( nanoID )
 import Database.MySQL.Simple
@@ -17,6 +17,7 @@ import UnliftIO.Exception (catch)
 import Web.Scotty
 
 import qualified Types.Pasta as Pasta
+import qualified Types.UpdatedPasta as UP
 import qualified Types.ViewKey as VK
 
 returnPasta:: Pasta.Pasta -> Value
@@ -127,3 +128,50 @@ deletePasta = delete "/api/pasta/:slug" $ do
                 else do
                     status status200
                     json (object ["message" .= ("Pasta deleted successfully" :: String)])
+
+updatePasta :: ScottyM ()
+updatePasta = put "/api/pasta/:id" $ do
+    conn <- liftIO connection
+
+    idParam <- captureParam "id" :: ActionM Int
+    updatedPasta <- jsonData :: ActionM UP.Pasta
+
+    currEditKey <- liftIO $ try @SomeException $ do
+        query conn
+            "SELECT id, title, content, NULL AS slug, NULL AS view_key, edit_key FROM pasta WHERE id = ?"
+            (Only idParam) :: IO [Pasta.Pasta]
+
+    case currEditKey of
+        Left ex -> do
+            status status500
+            json $ object ["error" .= ("Database error: " ++ show (ex :: SomeException))]
+        Right [] -> do
+            status status404
+            json $ object ["error" .= ("No pasta entry found for id: " ++ show idParam)]
+        Right (pasta:_) -> do
+            let currentEditKey = fromMaybe "" (Pasta.edit_key pasta)
+                providedEditKey = fromMaybe "" (UP.edit_key updatedPasta)
+
+            if currentEditKey == providedEditKey
+                then do
+                    let newSlug = UP.slug updatedPasta
+                        newTitle = UP.title updatedPasta
+                        newContent = UP.content updatedPasta
+                        newViewKey = UP.view_key updatedPasta
+                        newEditKey = UP.updated_edit_key updatedPasta
+
+                    updateResult <- liftIO $ try @SomeException $ do
+                        execute conn
+                            "UPDATE pasta SET title = ?, content = ?, slug = ?, view_key = ?, edit_key = ? WHERE id = ?"
+                            (newTitle, newContent, newSlug, newViewKey, newEditKey, idParam)
+
+                    case updateResult of
+                        Left err -> do
+                            status status500
+                            json $ object ["error" .= ("Failed to update pasta" :: String), "details" .= show err]
+                        Right _ -> do
+                            status status200
+                            json (object ["message" .= ("Pasta updated successfully" :: String)])
+                else do
+                    status status401
+                    json $ object ["error" .= ("Invalid edit key" :: String)]
