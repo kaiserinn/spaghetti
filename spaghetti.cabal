@@ -25,6 +25,7 @@ source-repository head
 
 library
   exposed-modules:
+      Routes.Pasta
       Services.Connect
       Types.Pasta
       Types.ViewKey
