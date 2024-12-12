@@ -9,12 +9,29 @@ import Control.Monad.IO.Class (liftIO)
 import Data.Aeson (Value, object, (.=),)
 import Data.Maybe (fromMaybe)
 import Data.NanoID ( nanoID )
-import Database.MySQL.Simple
+import Database.MySQL.Simple ( execute, query, Only(Only) )
 import Network.HTTP.Types.Status
+    ( status500,
+      status400,
+      status200,
+      status201,
+      status401,
+      status404,
+      status409 )
 import Services.Connect (connection)
 import System.Random.MWC (createSystemRandom)
 import UnliftIO.Exception (catch)
 import Web.Scotty
+    ( ScottyM,
+      captureParam,
+      delete,
+      get,
+      json,
+      jsonData,
+      post,
+      put,
+      status,
+      ActionM )
 
 import qualified Types.Pasta as Pasta
 import qualified Types.UpdatedPasta as UP

@@ -5,6 +5,7 @@ module Types.Pasta (Pasta(..)) where
 
 import Data.Aeson (FromJSON, ToJSON)
 import Database.MySQL.Simple.QueryResults
+    ( QueryResults(..), convertError )
 import Database.MySQL.Simple.Result (convert)
 import GHC.Generics ( Generic )
 
