@@ -7,7 +7,7 @@ import Services.Connect (connection)
 import Configuration.Dotenv (loadFile, defaultConfig)
 import Web.Scotty
 import Database.MySQL.Simple
-import Data.Aeson (object, (.=))
+import Data.Aeson (object, (.=), Value)
 import Control.Monad.IO.Class (liftIO)
 import Control.Exception (try, SomeException)
 import Network.HTTP.Types.Status
@@ -17,6 +17,14 @@ import Data.NanoID
 
 import qualified Types.Pasta as Pasta
 import qualified Types.ViewKey as VK
+
+returnPasta:: Pasta.Pasta -> Value
+returnPasta pasta = object [
+    "id" .= Pasta._id pasta,
+    "title" .= Pasta.title pasta,
+    "content" .= Pasta.content pasta,
+    "slug" .= Pasta.slug pasta
+    ]
 
 main :: IO ()
 main = do
@@ -46,13 +54,13 @@ main = do
                 Right (pasta:_) -> do
                     let requiredViewCode = Pasta.view_key pasta
                     case requiredViewCode of
-                        Nothing -> json pasta
+                        Nothing -> json $ returnPasta pasta
 
-                        Just "" -> json pasta
+                        Just "" -> json $ returnPasta pasta
 
                         Just expectedViewCode ->
                             if expectedViewCode == viewKey
-                                then json pasta
+                                then  json $ returnPasta pasta
                                 else do
                                     status status401
                                     json $ object ["error" .= ("Invalid or missing view code" :: String)]
@@ -61,7 +69,10 @@ main = do
             newPasta <- jsonData :: ActionM Pasta.Pasta
 
             randomId <- liftIO $ createSystemRandom >>= nanoID
-            let newSlug = fromMaybe (show randomId) (Pasta.slug newPasta)
+            let slugValue = Pasta.slug newPasta
+                newSlug = case slugValue of
+                    Just s | not (null s) -> s
+                    _                     -> show randomId
                 viewKey = fromMaybe "" (Pasta.view_key newPasta)
                 editKey = fromMaybe "" (Pasta.edit_key newPasta)
 

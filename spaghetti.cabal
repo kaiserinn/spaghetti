@@ -26,6 +26,8 @@ source-repository head
 library
   exposed-modules:
       Services.Connect
+      Types.Pasta
+      Types.ViewKey
   other-modules:
       Paths_spaghetti
   autogen-modules:
@@ -50,9 +52,6 @@ library
 executable spaghetti-exe
   main-is: Main.hs
   other-modules:
-      Types.Pasta
-      Types.PastaWithoutEditKey
-      Types.ViewKey
       Paths_spaghetti
   autogen-modules:
       Paths_spaghetti
