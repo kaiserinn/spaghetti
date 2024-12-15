@@ -2,11 +2,11 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications #-}
 
-module Routes.Pasta (getPastaById, addPasta, deletePasta, updatePasta) where
+module Routes.Pasta (getPastaBySlug, addPasta, deletePasta, updatePasta) where
 
 import Control.Exception (SomeException, try)
 import Control.Monad.IO.Class (liftIO)
-import Data.Aeson (Value, object, (.=),)
+import Data.Aeson (Value, object, (.=))
 import Data.Maybe (fromMaybe)
 import Data.NanoID ( nanoID )
 import Database.MySQL.Simple ( execute, query, Only(Only) )
@@ -36,6 +36,7 @@ import Web.Scotty
 import qualified Types.Pasta as Pasta
 import qualified Types.UpdatedPasta as UP
 import qualified Types.ViewKey as VK
+import qualified Types.EditKey as EK
 
 returnPasta:: Pasta.Pasta -> Value
 returnPasta pasta = object [
@@ -45,8 +46,26 @@ returnPasta pasta = object [
     "slug" .= Pasta.slug pasta
     ]
 
-getPastaById :: ScottyM ()
-getPastaById = get "/api/pasta/:slug" $ do
+performPastaDeletion :: String -> ActionM ()
+performPastaDeletion idParam = do
+    conn <- liftIO connection
+    result <- liftIO $ try @SomeException $ do
+        execute conn "DELETE FROM pasta WHERE id = ?" (Only idParam)
+    case result of
+        Left err -> do
+            status status500
+            json (object ["error" .= ("Failed to delete pasta" :: String), "details" .= show err])
+        Right rowsAffected -> do
+            if rowsAffected == 0
+                then do
+                    status status404
+                    json (object ["error" .= ("Pasta not found" :: String)])
+                else do
+                    status status200
+                    json (object ["message" .= ("Pasta deleted successfully" :: String)])
+
+getPastaBySlug :: ScottyM ()
+getPastaBySlug = get "/api/pasta/:slug" $ do
     conn <- liftIO connection
 
     slugParam <- captureParam "slug" :: ActionM String
@@ -125,26 +144,46 @@ addPasta = post "/api/pasta" $ do
 
 
 deletePasta :: ScottyM ()
-deletePasta = delete "/api/pasta/:slug" $ do
+deletePasta = delete "/api/pasta/:id" $ do
     conn <- liftIO connection
 
-    slugParam <- captureParam "slug" :: ActionM String
+    idParam <- captureParam "id" :: ActionM String
+    bodyEditKey <- catch (jsonData :: ActionM EK.EditKey) (\(_ :: SomeException) -> return EK.EditKey { EK.edit_key = Nothing })
+
+    let editKey = fromMaybe "" (EK.edit_key bodyEditKey)
 
     result <- liftIO $ try @SomeException $ do
-        execute conn "DELETE FROM pasta WHERE slug = ?" (Only slugParam)
+        query conn "SELECT id, title, content, slug, NULL AS view_key, edit_key FROM pasta WHERE id = ?"
+            (Only idParam) :: IO [Pasta.Pasta]
 
     case result of
-        Left err -> do
+        Left ex -> do
             status status500
-            json (object ["error" .= ("Failed to delete pasta" :: String), "details" .= show err])
-        Right rowsAffected -> do
-            if rowsAffected == 0
-                then do
-                    status status404
-                    json (object ["error" .= ("Pasta not found" :: String)])
-                else do
-                    status status200
-                    json (object ["message" .= ("Pasta deleted successfully" :: String)])
+            json $ object ["error" .= ("Database error: " ++ show (ex :: SomeException))]
+
+        Right [] -> do
+            status status404
+            json $ object ["error" .= ("No pasta entry found for ID: " ++ idParam)]
+
+        Right (pasta:_) -> do
+            let requiredEditCode = Pasta.edit_key pasta
+            case requiredEditCode of
+                Nothing -> do
+                    performPastaDeletion idParam
+                    json $ object ["message" .= ("Pasta deleted successfully" :: String)]
+
+                Just "" -> do
+                    performPastaDeletion idParam
+                    json $ object ["message" .= ("Pasta deleted successfully" :: String)]
+
+                Just expectedEditCode ->
+                    if expectedEditCode == editKey
+                        then do
+                            performPastaDeletion idParam
+                            json $ object ["message" .= ("Pasta deleted successfully" :: String)]
+                        else do
+                            status status401
+                            json $ object ["error" .= ("Invalid or missing view code" :: String)]
 
 updatePasta :: ScottyM ()
 updatePasta = put "/api/pasta/:id" $ do

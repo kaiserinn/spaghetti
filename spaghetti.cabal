@@ -27,6 +27,7 @@ library
   exposed-modules:
       Routes.Pasta
       Services.Connect
+      Types.EditKey
       Types.Pasta
       Types.UpdatedPasta
       Types.ViewKey
