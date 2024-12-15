@@ -1,0 +1,26 @@
+meta {
+  name: update pasta with invalid edit code
+  type: http
+  seq: 8
+}
+
+put {
+  url: {{PROTOCOL}}://{{URL}}/{{PREFIX}}/pasta/:id
+  body: json
+  auth: none
+}
+
+params:path {
+  id: 2
+}
+
+body:json {
+  {
+    "title": "Edited Pasta",
+    "content": "Edited pasta content.",
+    "slug": "editedslug",
+    "view_key": "code",
+    "edit_key": "invalid",
+    "updated_edit_key": "edit"
+  }
+}

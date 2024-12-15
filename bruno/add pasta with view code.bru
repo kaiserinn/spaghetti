@@ -1,0 +1,20 @@
+meta {
+  name: add pasta with view code
+  type: http
+  seq: 10
+}
+
+post {
+  url: {{PROTOCOL}}://{{URL}}/{{PREFIX}}/pasta
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "title": "New Pasta With View Code",
+    "content": "Pasta content with viwe code.",
+    "slug": "pastawithview",
+    "view_key": "view"
+  }
+}

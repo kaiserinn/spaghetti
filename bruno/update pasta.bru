@@ -1,0 +1,25 @@
+meta {
+  name: update pasta
+  type: http
+  seq: 6
+}
+
+put {
+  url: {{PROTOCOL}}://{{URL}}/{{PREFIX}}/pasta/:id
+  body: json
+  auth: none
+}
+
+params:path {
+  id: 1
+}
+
+body:json {
+  {
+    "title": "Edited Pasta",
+    "content": "Edited pasta content.",
+    "slug": "editedslug",
+    "view_key": "code",
+    "updated_edit_key": ""
+  }
+}

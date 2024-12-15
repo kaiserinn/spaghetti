@@ -1,0 +1,19 @@
+meta {
+  name: add pasta
+  type: http
+  seq: 9
+}
+
+post {
+  url: {{PROTOCOL}}://{{URL}}/{{PREFIX}}/pasta
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "title": "New Pasta",
+    "content": "Pasta content.",
+    "slug": ""
+  }
+}

@@ -1,0 +1,21 @@
+meta {
+  name: del one with edit code
+  type: http
+  seq: 6
+}
+
+delete {
+  url: {{PROTOCOL}}://{{URL}}/{{PREFIX}}/pasta/:id
+  body: json
+  auth: none
+}
+
+params:path {
+  id: 2
+}
+
+body:json {
+  {
+    "edit_key": "edit"
+  }
+}

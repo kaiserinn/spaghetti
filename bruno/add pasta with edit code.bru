@@ -1,0 +1,20 @@
+meta {
+  name: add pasta with edit code
+  type: http
+  seq: 11
+}
+
+post {
+  url: {{PROTOCOL}}://{{URL}}/{{PREFIX}}/pasta
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "title": "New Pasta With Edit Code",
+    "content": "Pasta content with edit code.",
+    "slug": "pastawithedit",
+    "edit_key": "edit"
+  }
+}

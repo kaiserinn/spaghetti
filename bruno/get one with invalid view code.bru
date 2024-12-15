@@ -1,0 +1,21 @@
+meta {
+  name: get one with invalid view code
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{PROTOCOL}}://{{URL}}/{{PREFIX}}/pasta/:slug
+  body: json
+  auth: none
+}
+
+params:path {
+  slug: slug3
+}
+
+body:json {
+  {
+    "view_key": "invalid"
+  }
+}
