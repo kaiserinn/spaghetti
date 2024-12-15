@@ -12,3 +12,9 @@ CREATE OR REPLACE TABLE pasta (
     created_at DATETIME NOT NULL DEFAULT NOW(),
     updated_at DATETIME NOT NULL DEFAULT NOW()
 );
+
+-- Dummy Data
+INSERT INTO pasta (title, content, slug, view_key, edit_key)
+    VALUES ('New Title', 'New content.', 'slug1', '', ''),
+           ('Edit Code', 'Content.', 'slug2', '', 'edit'),
+           ('View Code', 'Content.', 'slug3', 'view', '');
